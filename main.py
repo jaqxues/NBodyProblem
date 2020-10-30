@@ -1,8 +1,8 @@
+from random import random
 import numpy as np
 import scipy.constants
 import unsio.output
 from collections import namedtuple
-from tqdm import tqdm
 
 G = scipy.constants.G
 TIME_INTERVAL = 5
@@ -11,31 +11,24 @@ Body = namedtuple('Body', 'name, mass, position, velocity')
 
 
 def main():
-    def rd_vector(): return np.random.normal(0.5, 0.2, (3,))
+    print("Run as main only for debugging purposes. Please use the ipynb to run the simulation")
+    bodies = tuple(get_random_bodies(4))
+    arr = create_arr_from_bodies(bodies)
+    pretty_print_coordinates(bodies, arr)
 
-    bodies = (
-        Body(name='P1', mass=1, position=rd_vector(), velocity=rd_vector()),
-        Body(name='P2', mass=1 / 4, position=rd_vector(), velocity=rd_vector())
-    )
-
-    # arr = create_random(len(bodies))
-    arr = np.array(tuple((b.position, b.velocity) for b in bodies))
-
-    output = unsio.output.CUNS_OUT("computation.g2", 'gadget2', float32=False)
-
-    output.setData(np.arange(0, len(bodies), dtype=np.int32), 'stars', 'id')
-    output.setData(np.array([b.mass for b in bodies]), 'stars', 'mass')
-
-    for t in tqdm(range(1, 101)):
-        for _ in range(1000):
-            calc_next_step(arr, bodies)
-
-        output.setData(t, 'time')
-        output.setData(arr[:, [0]].flatten(), 'stars', 'pos')
-        output.setData(arr[:, [1]].flatten(), 'stars', 'vel')
-    output.save()
-    output.close()
     print(arr)
+    calc_next_step(arr, bodies)
+    print(arr)
+    for _ in range(10):
+        calc_next_step(arr, bodies)
+    print(arr)
+
+
+def get_random_bodies(n=2):
+    def rd_vector(mu): return np.random.normal(mu, 0.2, (3,))
+
+    for i in range(n):
+        yield Body(name=f'P{i}', mass=100 * random(), position=rd_vector(0.5), velocity=np.zeros((3,)))
 
 
 """
@@ -48,6 +41,15 @@ Numpy Float64 array with 3 axes (dimensions):
 * List of [Position, Velocity]
 * List of Coordinates (3DVector, 3*float64)
 """
+
+
+def pretty_print_coordinates(bodies, arr):
+    for body, x in zip(bodies, arr):
+        p = x[0]
+        coordinates = '; '.join(f'{p[i]:.4f}' for i in range(3))
+        print(f'{body.name} - Current Position ({coordinates})')
+
+
 def create_arr_from_bodies(bodies): return np.array(tuple((b.position, b.velocity) for b in bodies))
 def create_random(amount): return np.random.normal(0.5, 0.3, (amount, 2, 3))
 
@@ -67,23 +69,41 @@ def calc_next_step(arr, bodies):
     :return: Return array with updated velocities and positions
     """
     for idx1, b1 in enumerate(arr):
-        vel = np.zeros((3,))
+        acceleration = np.zeros((3,))
         for idx2, b2 in enumerate(arr):
 
             if idx1 == idx2:
                 continue
 
-            m1, m2 = bodies[idx1].mass, bodies[idx2].mass
+            d_vec = np.subtract(b2[0], b1[0])
+            normalized = d_vec / np.linalg.norm(d_vec)
 
-            dist_vector = (b1[0] - b2[0]) ** 2
-            normalized_v = dist_vector / np.linalg.norm(dist_vector)
-            r_2 = np.sum(dist_vector)
+            r_2 = np.sum(np.power(d_vec, 2))
+            m2 = bodies[idx2].mass
 
-            F = G * m2 / r_2
-            vel += normalized_v * F
-        arr[idx1, 1] = vel
+            a = G * m2 / r_2
+            acceleration += (a * normalized)
+        arr[idx1, 1] += acceleration * TIME_INTERVAL
     for idx, b in enumerate(arr):
-        arr[idx, 0] = b[0] + b[1] * TIME_INTERVAL
+        arr[idx, 0] += b[1] * TIME_INTERVAL
+
+
+def write_unsio_initial(output, bodies):
+    output.setData(np.arange(0, len(bodies), dtype=np.int32), 'stars', 'id')
+    output.setData(np.array([b.mass for b in bodies]), 'stars', 'mass')
+
+
+def unsio_example():
+    output = unsio.output.CUNS_OUT("computation.g2", 'gadget2', float32=False)
+    # Write
+    output.save()
+    output.close()
+
+
+def write_to_unsio(output, arr, t):
+    output.setData(t, 'time')
+    output.setData(arr[:, [0]].flatten(), 'stars', 'pos')
+    output.setData(arr[:, [1]].flatten(), 'stars', 'vel')
 
 
 if __name__ == '__main__':
