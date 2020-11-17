@@ -69,3 +69,14 @@ int main() {
     auto duration = chrono::duration_cast<chrono::milliseconds>(t2 - t1).count();
     cout << "Finished calculating step. (in " << duration << " ms)" << endl;
 }
+
+/*
+ * 2^10 Bodies: 40 ms
+ * 2^11 Bodies: 119 ms
+ * 2^12 Bodies: 369 ms
+ * 2^13 Bodies: 1445 ms
+ * 2^14 Bodies: 5757 ms
+ * 2^15 Bodies: 23079 ms
+ * 2^16 Bodies: 91905 ms
+ * 2^17 Bodies: 369668 ms
+ */
