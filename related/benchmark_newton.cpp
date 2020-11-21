@@ -11,7 +11,7 @@ const double newton_G = 6.67384e-11;
 const double TIME_STEP = 1;
 
 double *get_new_vel(double arr[][2][3], const double mass[], int idx, int arr_size) {
-    static double total_acc[3];
+    double total_acc[3];
     for (int i = 0; i < arr_size; ++i) {
         double v[3];
         for (int p = 0; p < 3; ++p) {
