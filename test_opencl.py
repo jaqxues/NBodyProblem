@@ -1,4 +1,5 @@
 import pyopencl as cl
+from tqdm import tqdm
 import os
 from random import random
 from scipy.constants import G
@@ -96,16 +97,11 @@ if __name__ == '__main__':
     platforms = cl.get_platforms()
     show_info(platforms)
 
-    # This allows sharing memory between multiple processes (without having to use blocking queues or other
-    # IPC mechanisms. This should be the fastest way and it is all abstracted as a Numpy array.
-    bodies = tuple(get_random_bodies(40000))
+    bodies = tuple(get_random_bodies(200))
     arr = create_arr_from_bodies(bodies)
     masses = np.array([b.mass for b in bodies])
 
-    print(arr)
-
-    ctx = cl.create_some_context(interactive=True)
-    # ctx = cl.Context(platforms[0].get_devices())
+    ctx = cl.create_some_context(interactive=False)
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
 
@@ -114,9 +110,29 @@ if __name__ == '__main__':
 
     with open("related/newton_test.cl", "r") as f:
         code = f.read()
+    code = code.replace("TIMESTEP", str(TIMESTEP))
+    prg = cl.Program(ctx, code).build()
 
-    for x in range(100):
-        prg = cl.Program(ctx, code).build()
-        prg.new_vel(queue, (len(bodies),), None, a_g, m_g, np.int32(len(bodies)))
-        queue.finish()
-    print(arr)
+    os.makedirs("output", exist_ok=True)
+
+    idx = 0
+    for idx in tqdm(range(200)):
+        try:
+            for _ in range(20):
+                prg.new_vel(queue, (len(bodies),), None, a_g, m_g, np.int32(len(bodies)))
+                queue.finish()
+                prg.new_pos(queue, (len(bodies),), None, a_g)
+                queue.finish()
+
+            output = unsio.output.CUNS_OUT(f"output/computation{idx}", 'gadget2', float32=False)
+            write_to_unsio(output, arr, bodies, idx)
+            output.save()
+            output.close()
+        except KeyboardInterrupt:
+            print("Interrupting Computation")
+            break
+
+    print("Generating Ascii File")
+    with open("output/file", "w+") as f:
+        for x in range(idx):
+            f.write(f"computation{x}\n")
