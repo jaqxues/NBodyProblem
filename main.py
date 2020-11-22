@@ -14,16 +14,17 @@ def newton_parallelized(ifrom, ito):
     for i1 in range(ifrom, ito):
         b1_pos = arr[i1][0]
         acceleration = np.zeros((3,))
-        for i2, b2_pos in enumerate(map(lambda x: x[0], arr)):
+        for i2 in range(len(arr)):
 
             if i1 == i2:
                 continue
+            b2_pos = arr[i2][0]
 
             d_vec = np.subtract(b2_pos, b1_pos)
             normalized = d_vec / np.linalg.norm(d_vec)
 
             r_2 = np.sum(np.power(d_vec, 2))
-            m2 = bodies[i2].mass
+            m2 = masses[i2]
 
             a = G * m2 / r_2
             acceleration += (a * normalized)
@@ -89,9 +90,13 @@ def write_to_unsio(output, arr, bodies, t):
 if __name__ == '__main__':
     # This allows sharing memory between multiple processes (without having to use blocking queues or other
     # IPC mechanisms. This should be the fastest way and it is all abstracted as a Numpy array.
-    bodies = tuple(get_random_bodies(400))
+    bodies = tuple(get_random_bodies(200))
     a = mp.Array(np.ctypeslib.as_ctypes_type(np.float64), len(bodies) * 6)
+    b = mp.Array(np.ctypeslib.as_ctypes_type(np.float64), len(bodies))
     arr = create_arr_from_bodies(bodies, np.frombuffer(a.get_obj()).reshape((len(bodies), 2, 3)))
+    masses = np.frombuffer(b.get_obj())
+    for idx, b in enumerate(bodies):
+        masses[idx] = b.mass
 
     os.makedirs("output", exist_ok=True)
 
