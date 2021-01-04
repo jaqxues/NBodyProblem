@@ -29,7 +29,8 @@ __kernel void new_vel(__global double *a_g, __global const double *m_g, const un
             r_2 += pown(d[i], 2);
 
         // a = Factor * Normalized distance Vector
-        double factor = NEWTON_G * (m_g[i] / r_2);
+        double factor = NEWTON_G * (m_g[i] / pown(sqrt(r_2 + 1e-6), 2)); // with softening
+//        double factor = NEWTON_G * (m_g[i] / r_2);
         for (int a = 0; a < 3; ++a) {
             total_acc[a] += factor * (d[a] / sqrt(r_2));
         }
